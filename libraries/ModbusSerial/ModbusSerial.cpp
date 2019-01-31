@@ -1,6 +1,7 @@
 /*
     ModbusSerial.cpp - Source for Modbus Serial Library
     Copyright (C) 2014 André Sarmento Barbosa
+    Perotto - included use of crc in flash
 */
 #include "ModbusSerial.h"
 
@@ -22,7 +23,7 @@ bool ModbusSerial::config(HardwareSerial* port, long baud, u_int format, int txP
     this->_txPin = txPin;
     (*port).begin(baud, format);
 
-    delay(2000);
+    //delay(2000);
 
     if (txPin >= 0) {
         pinMode(txPin, OUTPUT);
@@ -97,12 +98,12 @@ bool ModbusSerial::receive(byte* frame) {
 
     //Slave Check
     if (address != 0xFF && address != this->getSlaveId()) {
-		return false;
-	}
+    return false;
+  }
 
     //CRC Check
     if (crc != this->calcCrc(_frame[0], _frame+1, _len-3)) {
-		return false;
+    return false;
     }
 
     //PDU starts after first byte
@@ -164,7 +165,7 @@ bool ModbusSerial::sendPDU(byte* pduframe) {
 void ModbusSerial::task() {
     _len = 0;
 
-    while ((*_port).available() > _len)	{
+    while ((*_port).available() > _len) {
         _len = (*_port).available();
         delayMicroseconds(_t15);
     }
@@ -187,8 +188,9 @@ void ModbusSerial::task() {
     _len = 0;
 }
 
+#ifndef USE_FLASH_PROGMEM
 word ModbusSerial::calcCrc(byte address, byte* pduFrame, byte pduLen) {
-	byte CRCHi = 0xFF, CRCLo = 0x0FF, Index;
+  byte CRCHi = 0xFF, CRCLo = 0x0FF, Index;
 
     Index = CRCHi ^ address;
     CRCHi = CRCLo ^ _auchCRCHi[Index];
@@ -202,8 +204,22 @@ word ModbusSerial::calcCrc(byte address, byte* pduFrame, byte pduLen) {
 
     return (CRCHi << 8) | CRCLo;
 }
+#endif
 
+#ifdef USE_FLASH_PROGMEM
+word ModbusSerial::calcCrc(byte address, byte* pduFrame, byte pduLen) {
+  byte CRCHi = 0xFF, CRCLo = 0x0FF, Index;
 
+  Index = CRCHi ^ address;
+  CRCHi = CRCLo ^ pgm_read_byte(&_auchCRCHi[Index]);
+  CRCLo = pgm_read_byte(&_auchCRCLo[Index]);
 
+  while (pduLen--) {
+    Index = CRCHi ^ *pduFrame++;
+    CRCHi = CRCLo ^ pgm_read_byte(&_auchCRCHi[Index]);
+    CRCLo = pgm_read_byte(&_auchCRCLo[Index]);
+  }
 
-
+  return (CRCHi << 8) | CRCLo;
+}
+#endif
