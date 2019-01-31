@@ -1,6 +1,7 @@
 /*
     ModbusSerial.h - Header for ModbusSerial Library
     Copyright (C) 2014 André Sarmento Barbosa
+    Perotto - included use of crc in flash
 */
 #include <Arduino.h>
 #include <Modbus.h>
